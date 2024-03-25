@@ -1,39 +1,33 @@
-# ECSE552-project
+# Modelling Sequential Data with Neural Differential Equations
 
-## Setting up a local repo
-1. Change the current working directory to your local project. 
-This can be done running the following command:
-```
-cd [your_project_directory]
-```
-2. Initialize as a git repository.
-```
-git init
-```
-4. Configure the origin as a remote repository.
-Run the following command (we name the remote repository upstream):
-```
-git remote add upstream https://github.com/tanakaakiyama/Temperature-Characterization-System-for-Biosensing-Devices.git
-```
-5. Sync your local repository with the upstream
-```
-git fetch upstream
-```
-6. Merge
-```
-git merge upstream/master
-```
+## Course: ECSE 552 - Deep Learning
 
-## Pushing changes to remote repository
-To push changes, first stage all changed files by running the following command:
-```
-git add .
-```
-Then commit and add a message:
-```
-git commit -m "Add your message here"
-```
-Then push your changes to the remote repository
-```
-git push upstream master
-```
+### University: McGill University
+
+#### Authors: Tanaka Akiyama, Gian Favero, Maxime Favreau-Vachon, Mohamed Mohamed
+
+##### Date: April 12th, 2024
+
+---
+
+## Repository Structure
+
+This repository is structured as follows:
+
+- **`data/`**: Contains raw and processed data used in the project.
+  - `raw/`: Raw data files.
+  - `processed/`: Processed data files.
+- **`notebooks/`**: Jupyter notebooks for exploration, preprocessing, and modeling.
+  - `exploratory/`: Notebooks for data exploration.
+  - `preprocessing/`: Notebooks for data preprocessing.
+  - `modeling/`: Notebooks for model training and evaluation.
+- **`src/`**: Source code for the project.
+  - `data/`: Scripts for data loading, preprocessing, and transformation.
+  - `models/`: Scripts for defining and training ML models.
+  - `evaluation/`: Scripts for model evaluation, metrics, and visualization.
+  - `utils/`: Utility scripts and helper functions.
+- **`experiments/`**: Directory for experiment tracking.
+- **`reports/`**: Project reports, documentation, and presentations.
+  - `figures/`: Figures and visualizations for reports and presentations.
+- **`requirements.txt`**: Python dependencies file.
+- **`README.md`**: Overview of the project, setup instructions, and usage guide.
