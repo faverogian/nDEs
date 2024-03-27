@@ -5,8 +5,65 @@ Created on Tue Mar 26 11:35:18 2024
 @author: Tanaka Akiyama
 """
 
-import netCDF4 as nc
 import os
+import numpy as np
+import netCDF4 as nc
+import pandas as pd
+
+# Function to calculate bi-weekly averages
+def calculate_biweekly_averages(data):
+    # Number of hours in two weeks
+    hours_per_biweek = 24 * 14
+
+    # Determine the number of complete bi-weekly segments
+    num_biweeks = len(data) // hours_per_biweek
+
+    # Adjust the data to include only the necessary number of hours
+    data = data[:num_biweeks * hours_per_biweek]
+
+    # Reshape data to represent bi-weekly segments
+    data = data.reshape(-1, hours_per_biweek)
+
+    # Calculate bi-weekly averages
+    biweekly_averages = np.mean(data, axis=1)
+    
+    return biweekly_averages
+
+# Load NetCDF file
+def load_netcdf(file_path):
+    dataset = nc.Dataset(file_path)
+    return dataset
+
+# Main function
+def process_netcdf(file_path):
+    dataset = load_netcdf(file_path)
+    latitude = dataset.variables['latitude'][:]
+    longitude = dataset.variables['longitude'][:]
+    time = dataset.variables['time'][:]
+    # Extract the values corresponding to the third index (middle value)
+    middle_lat_index = len(latitude) // 2
+    middle_lon_index = len(longitude) // 2
+    temperature = dataset.variables['t'][:, middle_lat_index, middle_lon_index]
+    humidity = dataset.variables['r'][:, middle_lat_index, middle_lon_index]
+    dataset.close()
+
+    # Calculate bi-weekly averages for temperature and humidity
+    temperature_biweekly = calculate_biweekly_averages(temperature)
+    humidity_biweekly = calculate_biweekly_averages(humidity)
+
+    # Create DataFrame with temperature, humidity, and index columns
+    df = pd.DataFrame({
+        'temperature': temperature_biweekly,
+        'humidity': humidity_biweekly,
+        'index': range(1, len(temperature_biweekly) + 1)  # 1 to 24
+    })
+
+    # Save DataFrame to CSV file
+    output_folder = 'processed'
+    os.makedirs(output_folder, exist_ok=True)
+    output_file = os.path.join(output_folder, 'processed_weather_data.csv')
+    df.to_csv(output_file, index=False)
+    print("Processed data saved to:", output_file)
 
 '''
 Prints netcdf file metadata.
@@ -14,37 +71,6 @@ Prints netcdf file metadata.
 Parameters:
 file_path - string path to netcdf file
 '''
-
-import os
-import netCDF4 as nc
-import pandas as pd
-
-def calculate_biweekly_average(data):
-    # Reshape data to have one row per time step
-    reshaped_data = data.reshape(data.shape[0], -1)
-    # Calculate bi-weekly averages
-    biweekly_average = pd.DataFrame(reshaped_data).rolling(window=336).mean().dropna(how='any')
-    return biweekly_average
-
-def save_to_csv(biweekly_average, file_path):
-    biweekly_average.to_csv(file_path, header=["Temperature", "Humidity", "Time"], index=False)
-
-def process_netcdf(file_path):
-    try:
-        dataset = nc.Dataset(file_path)
-        temperature = dataset.variables['t'][:]
-        humidity = dataset.variables['r'][:]
-        time = dataset.variables['time'][:]
-        biweekly_avg_temperature = calculate_biweekly_average(temperature)
-        biweekly_avg_humidity = calculate_biweekly_average(humidity)
-        biweekly_avg_time = calculate_biweekly_average(time)
-        biweekly_avg_time.index = pd.to_datetime(biweekly_avg_time.index, unit='h', origin='1900-01-01')
-        biweekly_average = pd.concat([biweekly_avg_temperature, biweekly_avg_humidity, biweekly_avg_time], axis=1)
-        return biweekly_average
-    except Exception as e:
-        print("Error:", e)
-
-
 def print_netcdf_metadata(file_path):
     try:
         dataset = nc.Dataset(file_path)
@@ -81,22 +107,6 @@ netcdf_file_path = os.path.join(current_directory, "raw", netcdf_file_name)
 # print_netcdf_metadata(netcdf_file_path)
 
 
-# Replace 'your_netcdf_file.nc' with the path to your NetCDF file
-#netcdf_file_path = 'your_netcdf_file.nc'
-processed_folder = 'processed'
-processed_file_name = 'processed_weather_data.csv'
+# Example usage
+process_netcdf(netcdf_file_path)
 
-# Ensure the processed folder exists, if not, create it
-if not os.path.exists(processed_folder):
-    os.makedirs(processed_folder)
-
-# Construct the file path for saving processed data
-processed_file_path = os.path.join(processed_folder, processed_file_name)
-
-# Process NetCDF file and save to CSV
-biweekly_average_data = process_netcdf(netcdf_file_path)
-if biweekly_average_data is not None:
-    save_to_csv(biweekly_average_data, processed_file_path)
-    print("Data saved to:", processed_file_path)
-else:
-    print("Error processing NetCDF file.")
