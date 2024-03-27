@@ -46,6 +46,10 @@ def process_netcdf(file_path):
     temperature = dataset.variables['t'][:, middle_lat_index, middle_lon_index]
     humidity = dataset.variables['r'][:, middle_lat_index, middle_lon_index]
     dataset.close()
+    
+    # Apply scale and offset to temperature and humidity data
+    temperature = temperature * 0.0009400897727278146 + 277.5637541982777
+    humidity = humidity * 0.0015225149751930131 + 64.0700190197646
 
     # Calculate bi-weekly averages for temperature and humidity
     temperature_biweekly = calculate_biweekly_averages(temperature)
