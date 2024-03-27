@@ -1,0 +1,4 @@
+processed_weather_data.csv
+
+This file contains 3 columns (temperature, humidity, index) and 27 rows. Each row represents a bi-weekly average.
+The original data was taken in hourly values from 2018 in the center of Montreal. 
