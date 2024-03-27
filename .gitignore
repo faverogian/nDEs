@@ -1,0 +1,19 @@
+# Ignore virtual environment directories
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Ignore pipenv environment
+.Python
+
+# Ignore pipfile.lock
+pipfile.lock
+
+# Ignore PyInstaller files
+/dist/
+/build/
+
+# Ignore Jupyter notebook checkpoint files
+.ipynb_checkpoints/
