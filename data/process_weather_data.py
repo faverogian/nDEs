@@ -102,7 +102,7 @@ current_directory = os.path.dirname(os.path.realpath(__file__))
 
 # Specify the relative path to the NetCDF file within the folder
 netcdf_file_name = "adaptor.mars.internal-1711483951.73343-1890-12-9368dd45-a5b4-44e1-8eea-b823672a0f77.nc"
-netcdf_file_path = os.path.join(current_directory, "raw", netcdf_file_name)
+netcdf_file_path = os.path.join(current_directory, "raw/weather", netcdf_file_name)
 
 # print_netcdf_metadata(netcdf_file_path)
 
