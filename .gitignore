@@ -17,3 +17,6 @@ pipfile.lock
 
 # Ignore Jupyter notebook checkpoint files
 .ipynb_checkpoints/
+
+# Ignore Python bytecode files
+*.pyc
