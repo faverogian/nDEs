@@ -16,11 +16,11 @@ from src.data.cde_transforms import insert_random_missingness, fill_forward
 HP = {
     'data_path': '../data/processed/CharacterTrajectories/classification',
     'epochs': 1000,
-    'lr': 1e-2,
+    'lr': 1e-3,
     'batch_size': 32,
     'input_channels': 5,
     'hidden_channels': 32,
-    'output_channels': 1,
+    'output_channels': 20,
 }
 
 def main():
@@ -57,9 +57,6 @@ def main():
     # Define optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=HP['lr'])
 
-    # Define LR scheduler
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
-
     # Set up train dataloader
     train_coeffs = torchcde.hermite_cubic_coefficients_with_backward_differences(X_train)
     train_dataset = torch.utils.data.TensorDataset(train_coeffs, y_train)
@@ -70,9 +67,8 @@ def main():
     val_dataset = torch.utils.data.TensorDataset(val_coeffs, y_val)
     val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=HP['batch_size'])
 
-    model.train()
-
     for epoch in range(HP['epochs']):
+        model.train()
         for i, batch in enumerate(train_dataloader):
             batch_coeffs, batch_y = batch
             batch_coeffs, batch_y = batch_coeffs.to(device), batch_y.to(device)
@@ -82,17 +78,15 @@ def main():
             pred_y = pred_y.squeeze(-1)
 
             # Get loss
-            loss = criterion(pred_y, batch_y)
+            loss = criterion(pred_y, batch_y.long())
 
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
 
-        scheduler.step()
-
         print('Epoch: {}   Training loss: {}'.format(epoch, loss.item()))
 
-        if epoch % 10:
+        if epoch % 10 == 0:
             model.eval()
 
             with torch.no_grad():
@@ -104,7 +98,6 @@ def main():
                     # Get predictions
                     pred_y = model(batch_coeffs)
                     pred_y = pred_y.squeeze(-1)
-                    pred_y = torch.nn.functional.softmax(pred_y, dim=1)
 
                     # Get accuracy
                     pred_y = torch.argmax(pred_y, dim=1)
@@ -113,6 +106,8 @@ def main():
                     val_accs.append(val_acc)
 
                 print('Validation accuracy: {}'.format(np.mean(val_accs)))
+            
+            model.train()
 
 
 if __name__ == '__main__':
