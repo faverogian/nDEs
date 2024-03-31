@@ -31,7 +31,9 @@ class CDEFunc(torch.nn.Module):
 
         self.linear1 = torch.nn.Linear(hidden_channels, hidden_channels)
         self.linear2 = torch.nn.Linear(hidden_channels, hidden_channels)
-        self.linear3 = torch.nn.Linear(hidden_channels, input_channels * hidden_channels)
+        self.linear3 = torch.nn.Linear(hidden_channels, hidden_channels)
+        self.linear4 = torch.nn.Linear(hidden_channels, hidden_channels)
+        self.linear5 = torch.nn.Linear(hidden_channels, input_channels * hidden_channels)
 
     ######################
     # For most purposes the t argument can probably be ignored; unless you want your CDE to behave differently at
@@ -44,6 +46,10 @@ class CDEFunc(torch.nn.Module):
         z = self.linear2(z)
         z = z.relu()
         z = self.linear3(z)
+        z = z.relu()
+        z = self.linear4(z)
+        z = z.relu()
+        z = self.linear5(z)
         ######################
         # Easy-to-forget gotcha: Best results tend to be obtained by adding a final tanh nonlinearity.
         ######################
@@ -91,7 +97,7 @@ class NeuralCDE(torch.nn.Module):
                               adjoint=True,
                               t=X.interval,
                               method='rk4',
-                              options={'step_size': 1})
+                              options={'step_size': 5})
 
         ######################
         # Both the initial value and the terminal value are returned from cdeint; extract just the terminal value,
