@@ -15,7 +15,7 @@ from src.data.cde_transforms import insert_random_missingness, fill_forward
 # Define hyperparameters
 HP = {
     'data_path': '../data/processed/CharacterTrajectories/classification',
-    'epochs': 1000,
+    'epochs': 100,
     'lr': 1e-3,
     'batch_size': 32,
     'input_channels': 5,
@@ -69,6 +69,7 @@ def main():
 
     for epoch in range(HP['epochs']):
         model.train()
+        train_accs = []
         for i, batch in enumerate(train_dataloader):
             batch_coeffs, batch_y = batch
             batch_coeffs, batch_y = batch_coeffs.to(device), batch_y.to(device)
@@ -80,13 +81,18 @@ def main():
             # Get loss
             loss = criterion(pred_y, batch_y.long())
 
+            # Get accuracy
+            pred_y = torch.argmax(pred_y, dim=1)
+            train_acc = (pred_y == batch_y).sum().item() / len(batch_y)
+            train_accs.append(train_acc)
+
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
 
-        print('Epoch: {}   Training loss: {}'.format(epoch, loss.item()))
+        print('Epoch: {}   Training loss: {}'.format(epoch, loss.item()), 'Training accuracy: {}'.format(np.mean(train_accs)))
 
-        if epoch % 10 == 0:
+        if epoch % 1 == 0:
             model.eval()
 
             with torch.no_grad():
