@@ -13,7 +13,7 @@ from src.data.cde_transforms import insert_random_missingness, fill_forward
 
 # Define hyperparameters
 HP = {
-    'log_dir': '/logs/ncde_chartraj_classification',
+    'log_dir': '/logs',
     'data_path': '../../data/processed/CharacterTrajectories/classification',
     'missing_rate': 0.75,
     'epochs': 100,
