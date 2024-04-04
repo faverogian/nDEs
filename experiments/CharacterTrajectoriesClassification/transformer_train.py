@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torchcde
 import numpy as np
-from src.models.transformer import Transformer
+from src.models.Transformer import Transformer
 from src.data.cde_transforms import insert_random_missingness, preprocess_for_transformer
 
 # Define hyperparameters

@@ -86,7 +86,7 @@ def preprocess_for_transformer(X):
     input_ids = torch.nan_to_num(X, nan=0)  # Replace NaN with 0
 
     # Create attention mask
-    attention_mask = ~torch.isnan(X[:, :, 0])  # Create mask based on the first feature (time)
+    attention_mask = (X[:, :, 0] == 0)
     
     return input_ids, attention_mask
 

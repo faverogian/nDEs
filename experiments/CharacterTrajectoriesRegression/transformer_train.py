@@ -9,8 +9,8 @@ import torch
 import torch.nn as nn
 import torchcde
 import numpy as np
-from src.models.NeuralCDEODE import NeuralCDEODE
-from src.data.cde_transforms import fill_forward
+from src.models.TransformerSeq import Transformer
+from src.data.cde_transforms import preprocess_for_transformer
 
 # Set up matplotlib
 import matplotlib.pyplot as plt
@@ -26,8 +26,9 @@ HP = {
     'hidden_channels': 32,
     'output_channels': 3,
     'hidden_layers': 3,
-    'method': 'rk4',
-    'step_size': 1
+    'n_heads': 4,
+    'n_layers': 3,
+    'dropout': 0.1
 }
 
 def parse_args():
@@ -51,7 +52,7 @@ def set_gpu_device(gpu_id):
     return device
 
 def logger(train_stats, test_loss):
-    with open(f'./{HP["log_dir"]}/log_ncdeode.txt', 'w') as f:
+    with open(f'./{HP["log_dir"]}/log_transformer.txt', 'w') as f:
         f.write('Hyperparameters\n')
         for key, value in HP.items():
             f.write(f'{key}: {value}\n')
@@ -104,7 +105,7 @@ def plot_trajectory(pred_y, batch_y):
     plt.ylabel('Y')
     
     # Save the plot
-    plt.savefig(f'./{HP["log_dir"]}/trajectory_0.png')
+    plt.savefig(f'./{HP["log_dir"]}/trajectory_tf.png')
 
     # Explicitly close the figure
     plt.close()
@@ -123,12 +124,13 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
     for epoch in range(HP['epochs']):
         model.train()
         for i, batch in enumerate(train_dataloader):
-            batch_coeffs, batch_y = batch
-            batch_coeffs, batch_y = batch_coeffs.to(device), batch_y.to(device)
+            batch_x, batch_mask, batch_y, target_mask = batch
+            batch_x, batch_mask, batch_y, target_mask = batch_x.to(device), batch_mask.to(device), batch_y.to(device), target_mask.to(device)
 
             # Get predictions
-            pred_y = model(batch_coeffs)
+            pred_y = model(batch_x, batch_y, batch_mask, target_mask)
             pred_y = pred_y.squeeze(-1)
+            pred_y = pred_y.permute(1, 0, 2)
 
             # Get mask of batch_y (where all values are zero)
             batch_y, mask = strip_y(batch_y)
@@ -150,12 +152,13 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
         with torch.no_grad():
             val_losses = []
             for i, batch in enumerate(val_dataloader):
-                batch_coeffs, batch_y = batch
-                batch_coeffs, batch_y = batch_coeffs.to(device), batch_y.to(device)
+                batch_x, batch_mask, batch_y = batch
+                batch_x, batch_mask, batch_y = batch_x.to(device), batch_mask.to(device), batch_y.to(device)
 
                 # Get predictions
-                pred_y = model(batch_coeffs)
+                pred_y = model(batch_x, batch_y, batch_mask)
                 pred_y = pred_y.squeeze(-1)
+                pred_y = pred_y.permute(1, 0, 2)
 
                 # Get mask of batch_y (where all values are zero)
                 batch_y, mask = strip_y(batch_y)
@@ -170,6 +173,7 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
 
             print('Validation loss: {}'.format(np.mean(val_losses)))
 
+        if epoch % 10 == 0:
             plot_trajectory(pred_y, batch_y)
         
         # Update history
@@ -190,12 +194,13 @@ def evaluate(model, criterion, test_dataloader, device):
     with torch.no_grad():
         test_losses = []
         for i, batch in enumerate(test_dataloader):
-            batch_coeffs, batch_y = batch
-            batch_coeffs, batch_y = batch_coeffs.to(device), batch_y.to(device)
+            batch_x, batch_mask, batch_y = batch
+            batch_x, batch_mask, batch_y = batch_x.to(device), batch_mask.to(device), batch_y.to(device)
 
             # Get predictions
-            pred_y = model(batch_coeffs)
+            pred_y = model(batch_x, batch_y, batch_mask)
             pred_y = pred_y.squeeze(-1)
+            pred_y = pred_y.permute(1, 0, 2)
 
             # Get mask of batch_y (where all values are zero)
             batch_y, mask = strip_y(batch_y)
@@ -204,7 +209,7 @@ def evaluate(model, criterion, test_dataloader, device):
             pred_y = pred_y * mask
 
             # Get loss
-            test_loss = criterion(pred_y, batch_y.long()) / len(batch_y)
+            test_loss = criterion(pred_y, batch_y) / len(batch_y)
 
             test_losses.append(test_loss.item())
 
@@ -222,9 +227,10 @@ def main(device):
     X_test = torch.load(f'{HP["data_path"]}/X_test.pt')
     y_test = torch.load(f'{HP["data_path"]}/y_test.pt')
 
-    # Fill forward missing values
-    X_train = fill_forward(X_train)
-    X_test = fill_forward(X_test)
+    # Preprocess data
+    X_train, train_mask = preprocess_for_transformer(X_train)
+    y_train, target_mask = preprocess_for_transformer(y_train)
+    X_test, test_mask = preprocess_for_transformer(X_test)
 
     # Change to float32
     X_train = X_train.float()
@@ -236,24 +242,23 @@ def main(device):
     val_size = int(0.2 * len(X_train))
     X_train, X_val = X_train[:-val_size], X_train[-val_size:]
     y_train, y_val = y_train[:-val_size], y_train[-val_size:]
+    train_mask, val_mask = train_mask[:-val_size], train_mask[-val_size:]
+    target_mask = target_mask[:-val_size]
 
     # Set up train dataloader
-    train_coeffs = torchcde.hermite_cubic_coefficients_with_backward_differences(X_train)
-    train_dataset = torch.utils.data.TensorDataset(train_coeffs, y_train)
+    train_dataset = torch.utils.data.TensorDataset(X_train, train_mask, y_train, target_mask)
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=HP['batch_size'])
 
     # Set up validation dataloader
-    val_coeffs = torchcde.hermite_cubic_coefficients_with_backward_differences(X_val)
-    val_dataset = torch.utils.data.TensorDataset(val_coeffs, y_val)
+    val_dataset = torch.utils.data.TensorDataset(X_val, val_mask, y_val)
     val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=HP['batch_size'])
 
     # Set up test dataloader
-    test_coeffs = torchcde.hermite_cubic_coefficients_with_backward_differences(X_test)
-    test_dataset = torch.utils.data.TensorDataset(test_coeffs, y_test)
+    test_dataset = torch.utils.data.TensorDataset(X_test, test_mask, y_test)
     test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=HP['batch_size'])
 
     # Define model
-    model = NeuralCDEODE(HP['input_channels'], HP['hidden_channels'], HP['output_channels'], missing_data=0.3)
+    model = Transformer(HP['input_channels'], HP['hidden_channels'], HP['output_channels'], HP['n_heads'], HP['n_layers'], HP['dropout'])
     model.to(device)
 
     # Define loss function
@@ -263,7 +268,7 @@ def main(device):
     optimizer = torch.optim.Adam(model.parameters(), lr=HP['lr'])
 
     history, best_model = train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, device)
-    test_loss = evaluate(best_model, test_dataloader, device)
+    test_loss = evaluate(best_model, criterion, test_dataloader, device)
     logger(history, test_loss)
 
 
