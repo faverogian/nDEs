@@ -61,6 +61,36 @@ def insert_random_missingness(X, missing_rate=0.25):
 
     return out
 
+
+def preprocess_for_transformer(X):
+    """
+    Preprocesses the output of insert_random_missingness for a transformer model.
+
+    Parameters
+    ----------
+    X : torch.Tensor
+        The input data with missingness inserted as NaNs across the datapoint.
+        A cumulative mask channel is concatenated to the input data to indicate
+        missingness. Shape (n_samples, sequence_length, n_features + 1)
+
+    Returns
+    -------
+    input_ids : torch.Tensor
+        The input tensor for the transformer model with special tokens for NaN values.
+        Shape (n_samples, sequence_length, n_features + 1)
+    attention_mask : torch.Tensor
+        The attention mask tensor indicating the padding positions.
+        Shape (n_samples, sequence_length)
+    """
+    # Convert NaN values to a special token
+    input_ids = torch.nan_to_num(X, nan=0)  # Replace NaN with 0
+
+    # Create attention mask
+    attention_mask = ~torch.isnan(X[:, :, 0])  # Create mask based on the first feature (time)
+    
+    return input_ids, attention_mask
+
+
 def fill_forward(X):
     '''
     Fill forward missing values in the data.

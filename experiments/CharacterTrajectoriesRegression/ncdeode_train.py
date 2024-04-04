@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 HP = {
     'log_dir': '/logs',
     'data_path': '../../data/processed/CharacterTrajectories/regression/30',
-    'epochs': 100,
+    'epochs': 500,
     'lr': 1e-3,
     'batch_size': 32,
     'input_channels': 4,
@@ -53,8 +53,8 @@ def strip_y(y):
 
 def plot_trajectory(pred_y, batch_y):
     # Plot predicted trajectory and ground truth trajectory
-    pred_vx, pred_vy, pred_f = [pred_y[0, : , i].cpu().numpy() for i in range(3)]
-    true_vx, true_vy, true_f = [batch_y[0, : , i].cpu().numpy() for i in range(3)]
+    pred_vx, pred_vy, pred_f = [pred_y[-1, : , i].cpu().numpy() for i in range(3)]
+    true_vx, true_vy, true_f = [batch_y[-1, : , i].cpu().numpy() for i in range(3)]
 
     # Integrate velocities to get positions
     pred_x, pred_y = np.cumsum(pred_vx), np.cumsum(pred_vy)
@@ -84,6 +84,9 @@ def plot_trajectory(pred_y, batch_y):
     
     # Save the plot
     plt.savefig(f'./{HP["log_dir"]}/trajectory_0.png')
+
+    # Explicitly close the figure
+    plt.close()
 
 def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, device):
 

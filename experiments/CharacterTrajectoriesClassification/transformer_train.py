@@ -1,16 +1,16 @@
 import pathlib
 import sys
+import argparse
 
 _here = pathlib.Path(__file__).resolve().parent
 sys.path.append(str(_here / '../../'))
 
-import argparse
 import torch
 import torch.nn as nn
 import torchcde
 import numpy as np
-from src.models.NeuralCDE import NeuralCDE
-from src.data.cde_transforms import insert_random_missingness, fill_forward
+from src.models.transformer import Transformer
+from src.data.cde_transforms import insert_random_missingness, preprocess_for_transformer
 
 # Define hyperparameters
 HP = {
@@ -24,8 +24,9 @@ HP = {
     'hidden_channels': 32,
     'output_channels': 20,
     'hidden_layers': 3,
-    'method': 'rk4',
-    'step_size': 1
+    'n_heads': 4,
+    'n_layers': 3,
+    'dropout': 0.1
 }
 
 def parse_args():
@@ -49,7 +50,7 @@ def set_gpu_device(gpu_id):
     return device
 
 def logger(train_stats, test_acc):
-    with open(f'./{HP["log_dir"]}/log_ncde_{int(HP["missing_rate"]*100)}.txt', 'w') as f:
+    with open(f'./{HP["log_dir"]}/log_transformer_{int(HP["missing_rate"]*100)}.txt', 'w') as f:
         f.write('Hyperparameters\n')
         for key, value in HP.items():
             f.write(f'{key}: {value}\n')
@@ -76,11 +77,11 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
         model.train()
         train_accs = []
         for i, batch in enumerate(train_dataloader):
-            batch_coeffs, batch_y = batch
-            batch_coeffs, batch_y = batch_coeffs.to(device), batch_y.to(device)
+            batch_x, batch_mask, batch_y = batch
+            batch_x, batch_mask, batch_y = batch_x.to(device), batch_mask.to(device), batch_y.to(device)
 
             # Get predictions
-            pred_y = model(batch_coeffs)
+            pred_y = model(batch_x, batch_mask)
             pred_y = pred_y.squeeze(-1)
 
             # Get loss
@@ -102,11 +103,11 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
         with torch.no_grad():
             val_accs = []
             for i, batch in enumerate(val_dataloader):
-                batch_coeffs, batch_y = batch
-                batch_coeffs, batch_y = batch_coeffs.to(device), batch_y.to(device)
+                batch_x, batch_mask, batch_y = batch
+                batch_x, batch_mask, batch_y = batch_x.to(device), batch_mask.to(device), batch_y.to(device)
 
                 # Get predictions
-                pred_y = model(batch_coeffs)
+                pred_y = model(batch_x, batch_mask)
                 pred_y = pred_y.squeeze(-1)
 
                 # Get accuracy
@@ -136,11 +137,11 @@ def evaluate(model, test_dataloader, device):
     with torch.no_grad():
         test_accs = []
         for i, batch in enumerate(test_dataloader):
-            batch_coeffs, batch_y = batch
-            batch_coeffs, batch_y = batch_coeffs.to(device), batch_y.to(device)
+            batch_x, batch_mask, batch_y = batch
+            batch_x, batch_mask, batch_y = batch_x.to(device), batch_mask.to(device), batch_y.to(device)
 
             # Get predictions
-            pred_y = model(batch_coeffs)
+            pred_y = model(batch_x, batch_mask)
             pred_y = pred_y.squeeze(-1)
 
             # Get accuracy
@@ -164,9 +165,9 @@ def main(device):
     X_train = insert_random_missingness(X_train, HP['missing_rate'])
     X_test = insert_random_missingness(X_test, HP['missing_rate'])
 
-    # Fill forward missing values
-    X_train = fill_forward(X_train)
-    X_test = fill_forward(X_test)
+    # Preprocess for transformer
+    X_train, train_mask = preprocess_for_transformer(X_train)
+    X_test, test_mask = preprocess_for_transformer(X_test)
 
     # Change to float32
     X_train = X_train.float()
@@ -178,24 +179,22 @@ def main(device):
     val_size = int(0.2 * len(X_train))
     X_train, X_val = X_train[:-val_size], X_train[-val_size:]
     y_train, y_val = y_train[:-val_size], y_train[-val_size:]
+    train_mask, val_mask = train_mask[:-val_size], train_mask[-val_size:]
 
     # Set up train dataloader
-    train_coeffs = torchcde.hermite_cubic_coefficients_with_backward_differences(X_train)
-    train_dataset = torch.utils.data.TensorDataset(train_coeffs, y_train)
+    train_dataset = torch.utils.data.TensorDataset(X_train, train_mask, y_train)
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=HP['batch_size'])
 
     # Set up validation dataloader
-    val_coeffs = torchcde.hermite_cubic_coefficients_with_backward_differences(X_val)
-    val_dataset = torch.utils.data.TensorDataset(val_coeffs, y_val)
+    val_dataset = torch.utils.data.TensorDataset(X_val, val_mask, y_val)
     val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=HP['batch_size'])
 
     # Set up test dataloader
-    test_coeffs = torchcde.hermite_cubic_coefficients_with_backward_differences(X_test)
-    test_dataset = torch.utils.data.TensorDataset(test_coeffs, y_test)
+    test_dataset = torch.utils.data.TensorDataset(X_test, test_mask, y_test)
     test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=HP['batch_size'])
 
     # Define model
-    model = NeuralCDE(HP['input_channels'], HP['hidden_channels'], HP['output_channels'])
+    model = Transformer(HP['input_channels'], HP['hidden_channels'], HP['hidden_layers'], HP['output_channels'], HP['n_heads'], HP['dropout'])
     model.to(device)
 
     # Define loss function
