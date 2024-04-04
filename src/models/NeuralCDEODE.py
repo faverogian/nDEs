@@ -154,7 +154,8 @@ class NeuralCDEODE(torch.nn.Module):
         # Now solve the ODE.
         ######################
         # z_T = (batch, length // 2, hidden_channels)
-        z_T = odeint(self.ode_func, z_T, torch.arange(91), method='rk4', options={'step_size': 1})
+        z_T = odeint(self.ode_func, z_T, torch.arange(91).float(), method='rk4', options={'step_size': 1})
+        z_T = z_T.transpose(0, 1)
 
         # pred_y = (batch, length // 2, output_channels)
         pred_y = self.ode_readout(z_T)

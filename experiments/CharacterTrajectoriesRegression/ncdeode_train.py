@@ -26,7 +26,7 @@ HP = {
     'step_size': 1
 }
 
-def logger(train_stats, test_acc):
+def logger(train_stats, test_loss):
     with open(f'./{HP["log_dir"]}/log_ncdeode.txt', 'w') as f:
         f.write('Hyperparameters\n')
         for key, value in HP.items():
@@ -36,9 +36,19 @@ def logger(train_stats, test_acc):
         for key, value in train_stats.items():
             f.write(f'{key}: {value}\n')
         f.write('\n\n')
-        f.write(f'Test accuracy: {test_acc}\n')
+        f.write(f'Test accuracy: {test_loss}\n')
 
 def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, device):
+
+    def strip_y(y):
+        # Strip time channel
+        y = y[:, :, 1:]
+
+        # Get mask of y (where all values are zero)
+        mask = y == 0
+        mask = ~mask
+
+        return y, mask
 
     # Create history
     history = {
@@ -60,8 +70,7 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
             pred_y = pred_y.squeeze(-1)
 
             # Get mask of batch_y (where all values are zero)
-            mask = batch_y == 0
-            mask = ~mask
+            batch_y, mask = strip_y(batch_y)
 
             # Apply mask to pred_y
             pred_y = pred_y[mask]
@@ -193,8 +202,8 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=HP['lr'])
 
     history, best_model = train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, device)
-    test_acc = evaluate(best_model, test_dataloader, device)
-    logger(history, test_acc)
+    test_loss = evaluate(best_model, test_dataloader, device)
+    logger(history, test_loss)
 
 
 if __name__ == '__main__':
