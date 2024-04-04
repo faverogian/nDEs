@@ -108,7 +108,7 @@ class ODEFunc(torch.nn.Module):
 # Next, we need to package CDEFunc up into a model that computes the integral.
 ######################
 class NeuralCDEODE(torch.nn.Module):
-    def __init__(self, input_channels, hidden_channels, output_channels, interpolation="cubic"):
+    def __init__(self, input_channels, hidden_channels, output_channels, missing_data, interpolation="cubic"):
         super(NeuralCDEODE, self).__init__()
 
         self.cde_func = CDEFunc(input_channels, hidden_channels)
@@ -118,6 +118,7 @@ class NeuralCDEODE(torch.nn.Module):
         self.ode_readout = torch.nn.Linear(hidden_channels, output_channels)
 
         self.interpolation = interpolation
+        self.missing_data = missing_data
 
     def forward(self, coeffs):
         if self.interpolation == 'cubic':
@@ -153,8 +154,9 @@ class NeuralCDEODE(torch.nn.Module):
         ######################
         # Now solve the ODE.
         ######################
-        # z_T = (batch, length // 2, hidden_channels)
-        z_T = odeint(self.ode_func, z_T, torch.arange(91).float(), method='rk4', options={'step_size': 1})
+        # z_T = (batch, length // some value, hidden_channels)
+        missing_length = math.ceil(self.missing_data*182)
+        z_T = odeint(self.ode_func, z_T, torch.arange(missing_length).float(), method='rk4', options={'step_size': 1})
         z_T = z_T.transpose(0, 1)
 
         # pred_y = (batch, length // 2, output_channels)

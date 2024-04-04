@@ -11,10 +11,13 @@ import numpy as np
 from src.models.NeuralCDEODE import NeuralCDEODE
 from src.data.cde_transforms import fill_forward
 
+# Set up matplotlib
+import matplotlib.pyplot as plt
+
 # Define hyperparameters
 HP = {
     'log_dir': '/logs',
-    'data_path': '../../data/processed/CharacterTrajectories/regression',
+    'data_path': '../../data/processed/CharacterTrajectories/regression/30',
     'epochs': 100,
     'lr': 1e-3,
     'batch_size': 32,
@@ -38,17 +41,51 @@ def logger(train_stats, test_loss):
         f.write('\n\n')
         f.write(f'Test accuracy: {test_loss}\n')
 
+def strip_y(y):
+    # Strip time channel
+    y = y[:, :, 1:]
+
+    # Get mask of y (where all values are zero)
+    mask = y == 0
+    mask = ~mask
+
+    return y, mask
+
+def plot_trajectory(pred_y, batch_y):
+    # Plot predicted trajectory and ground truth trajectory
+    pred_vx, pred_vy, pred_f = [pred_y[0, : , i].cpu().numpy() for i in range(3)]
+    true_vx, true_vy, true_f = [batch_y[0, : , i].cpu().numpy() for i in range(3)]
+
+    # Integrate velocities to get positions
+    pred_x, pred_y = np.cumsum(pred_vx), np.cumsum(pred_vy)
+    true_x, true_y = np.cumsum(true_vx), np.cumsum(true_vy)
+
+    # Remove last element and insert 0 to the beginning
+    pred_x, pred_y = np.insert(pred_x[:-1], 0, 0), np.insert(pred_y[:-1], 0, 0)
+    true_x, true_y = np.insert(true_x[:-1], 0, 0), np.insert(true_y[:-1], 0, 0)
+
+    # Handle NaN values by only considering non-NaN values for normalization
+    min_value, max_value = np.nanmin(pred_f), np.nanmax(pred_f)
+    pred_f_normal = (pred_f - min_value) / (max_value - min_value)
+    min_value, max_value = np.nanmin(true_f), np.nanmax(true_f)
+    true_f_normal = (true_f - min_value) / (max_value - min_value)
+
+    # Plot
+    plt.figure(figsize=(10, 10))
+    plt.plot(pred_x, pred_y, label='Predicted trajectory', color='blue')
+    plt.plot(true_x, true_y, label='True trajectory', color='red')
+    plt.scatter(pred_x, pred_y, c=pred_f_normal, cmap='viridis', label='Predicted force')
+    plt.scatter(true_x, true_y, c=true_f_normal, cmap='viridis', label='True force')
+    plt.colorbar()
+    plt.legend()
+    plt.title('Predicted and true trajectory')
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    
+    # Save the plot
+    plt.savefig(f'./{HP["log_dir"]}/trajectory_0.png')
+
 def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, device):
-
-    def strip_y(y):
-        # Strip time channel
-        y = y[:, :, 1:]
-
-        # Get mask of y (where all values are zero)
-        mask = y == 0
-        mask = ~mask
-
-        return y, mask
 
     # Create history
     history = {
@@ -73,10 +110,10 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
             batch_y, mask = strip_y(batch_y)
 
             # Apply mask to pred_y
-            pred_y = pred_y[mask]
+            pred_y = pred_y * mask
 
             # Get loss
-            loss = criterion(pred_y, batch_y.long()) / len(batch_y)
+            loss = criterion(pred_y, batch_y) / len(batch_y)
 
             loss.backward()
             optimizer.step()
@@ -97,18 +134,19 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
                 pred_y = pred_y.squeeze(-1)
 
                 # Get mask of batch_y (where all values are zero)
-                mask = batch_y == 0
-                mask = ~mask
+                batch_y, mask = strip_y(batch_y)
 
                 # Apply mask to pred_y
-                pred_y = pred_y[mask]
+                pred_y = pred_y * mask
 
                 # Get loss
-                val_loss = criterion(pred_y, batch_y.long()) / len(batch_y)
+                val_loss = criterion(pred_y, batch_y) / len(batch_y)
 
-                val_losses.append(val_loss)
+                val_losses.append(val_loss.item())
 
-            print('Validation accuracy: {}'.format(np.mean(val_losses)))
+            print('Validation loss: {}'.format(np.mean(val_losses)))
+
+            plot_trajectory(pred_y, batch_y)
         
         # Update history
         history['train_loss'].append(loss.item())
@@ -136,18 +174,20 @@ def evaluate(model, criterion, test_dataloader, device):
             pred_y = pred_y.squeeze(-1)
 
             # Get mask of batch_y (where all values are zero)
-            mask = batch_y == 0
-            mask = ~mask
+            batch_y, mask = strip_y(batch_y)
 
             # Apply mask to pred_y
-            pred_y = pred_y[mask]
+            pred_y = pred_y * mask
 
             # Get loss
             test_loss = criterion(pred_y, batch_y.long()) / len(batch_y)
 
-            test_losses.append(test_loss)
+            test_losses.append(test_loss.item())
 
-        print('Test accuracy: {}'.format(np.mean(test_losses)))
+        print('Test loss: {}'.format(np.mean(test_losses)))
+
+        # Plot trajectory
+        plot_trajectory(pred_y, batch_y)
 
     return np.mean(test_losses)
     
@@ -192,7 +232,7 @@ def main():
     test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=HP['batch_size'])
 
     # Define model
-    model = NeuralCDEODE(HP['input_channels'], HP['hidden_channels'], HP['output_channels'])
+    model = NeuralCDEODE(HP['input_channels'], HP['hidden_channels'], HP['output_channels'], missing_data=0.3)
     model.to(device)
 
     # Define loss function
