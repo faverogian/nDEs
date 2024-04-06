@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 HP = {
     'log_dir': '/logs',
     'data_path': '../../data/processed/CharacterTrajectories/regression/30',
-    'epochs': 500,
+    'epochs': 150,
     'lr': 1e-3,
     'batch_size': 32,
     'input_channels': 4,
@@ -66,16 +66,33 @@ def strip_y(y):
     # Strip time channel
     y = y[:, :, 1:]
 
-    # Get mask of y (where all values are zero)
-    mask = y == 0
-    mask = ~mask
+    return y
 
-    return y, mask
+def baby_step_mask(y, epoch):
+    mask = torch.zeros_like(y)
+
+    if epoch < 25:
+        mask[:, :3, :] = 1
+    elif epoch < 50:
+        mask[:, :5, :] = 1
+    elif epoch < 75:
+        mask[:, :10, :] = 1
+    elif epoch < 100:
+        mask[:, :15, :] = 1
+    elif epoch < 125:
+        mask[:, :20, :] = 1
+    else:
+        mask[:, :, :] = 1
+
+    return mask
+
 
 def plot_trajectory(pred_y, batch_y):
+    id_range = pred_y.size(0)
+    id = np.random.randint(0, id_range)
     # Plot predicted trajectory and ground truth trajectory
-    pred_vx, pred_vy, pred_f = [pred_y[-1, : , i].cpu().numpy() for i in range(3)]
-    true_vx, true_vy, true_f = [batch_y[-1, : , i].cpu().numpy() for i in range(3)]
+    pred_vx, pred_vy, pred_f = [pred_y[id, : , i].cpu().numpy() for i in range(3)]
+    true_vx, true_vy, true_f = [batch_y[id, : , i].cpu().numpy() for i in range(3)]
 
     # Integrate velocities to get positions
     pred_x, pred_y = np.cumsum(pred_vx), np.cumsum(pred_vy)
@@ -104,7 +121,7 @@ def plot_trajectory(pred_y, batch_y):
     plt.ylabel('Y')
     
     # Save the plot
-    plt.savefig(f'./{HP["log_dir"]}/trajectory_0.png')
+    plt.savefig(f'./{HP["log_dir"]}/trajectory_ode.png')
 
     # Explicitly close the figure
     plt.close()
@@ -130,11 +147,15 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
             pred_y = model(batch_coeffs)
             pred_y = pred_y.squeeze(-1)
 
-            # Get mask of batch_y (where all values are zero)
-            batch_y, mask = strip_y(batch_y)
+            # Strip time channel
+            batch_y = strip_y(batch_y)
 
-            # Apply mask to pred_y
-            pred_y = pred_y * mask
+            # Get baby step mask
+            baby_mask = baby_step_mask(batch_y, epoch)
+
+            # Apply masks
+            pred_y = pred_y * baby_mask
+            batch_y = batch_y * baby_mask
 
             # Get loss
             loss = criterion(pred_y, batch_y) / len(batch_y)
@@ -158,10 +179,7 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
                 pred_y = pred_y.squeeze(-1)
 
                 # Get mask of batch_y (where all values are zero)
-                batch_y, mask = strip_y(batch_y)
-
-                # Apply mask to pred_y
-                pred_y = pred_y * mask
+                batch_y = strip_y(batch_y)
 
                 # Get loss
                 val_loss = criterion(pred_y, batch_y) / len(batch_y)
@@ -175,13 +193,6 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
         # Update history
         history['train_loss'].append(loss.item())
         history['val_loss'].append(np.mean(val_losses))
-
-        # Save best model
-        if np.mean(val_losses) < best_val_loss:
-            best_val_loss = np.mean(val_losses)
-            best_params = model.state_dict()
-
-    model.load_state_dict(best_params)
 
     return history, model
 
@@ -198,10 +209,7 @@ def evaluate(model, criterion, test_dataloader, device):
             pred_y = pred_y.squeeze(-1)
 
             # Get mask of batch_y (where all values are zero)
-            batch_y, mask = strip_y(batch_y)
-
-            # Apply mask to pred_y
-            pred_y = pred_y * mask
+            batch_y = strip_y(batch_y)
 
             # Get loss
             test_loss = criterion(pred_y, batch_y.long()) / len(batch_y)
@@ -209,9 +217,6 @@ def evaluate(model, criterion, test_dataloader, device):
             test_losses.append(test_loss.item())
 
         print('Test loss: {}'.format(np.mean(test_losses)))
-
-        # Plot trajectory
-        plot_trajectory(pred_y, batch_y)
 
     return np.mean(test_losses)
     
@@ -225,6 +230,8 @@ def main(device):
     # Fill forward missing values
     X_train = fill_forward(X_train)
     X_test = fill_forward(X_test)
+    y_train = fill_forward(y_train)
+    y_test = fill_forward(y_test)
 
     # Change to float32
     X_train = X_train.float()
@@ -263,8 +270,11 @@ def main(device):
     optimizer = torch.optim.Adam(model.parameters(), lr=HP['lr'])
 
     history, best_model = train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, device)
-    test_loss = evaluate(best_model, test_dataloader, device)
+    test_loss = evaluate(best_model, criterion, test_dataloader, device)
     logger(history, test_loss)
+
+    # Save model
+    torch.save(best_model.state_dict(), f'./{HP["log_dir"]}/ncdeode_model.pth')
 
 
 if __name__ == '__main__':

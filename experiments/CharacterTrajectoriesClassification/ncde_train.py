@@ -16,8 +16,8 @@ from src.data.cde_transforms import insert_random_missingness, fill_forward
 HP = {
     'log_dir': '/logs',
     'data_path': '../../data/processed/CharacterTrajectories/classification',
-    'missing_rate': 0.5,
-    'epochs': 500,
+    'missing_rate': 0.25,
+    'epochs': 100,
     'lr': 1e-3,
     'batch_size': 32,
     'input_channels': 5,
