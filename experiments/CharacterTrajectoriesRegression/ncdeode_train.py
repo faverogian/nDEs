@@ -66,7 +66,11 @@ def strip_y(y):
     # Strip time channel
     y = y[:, :, 1:]
 
-    return y
+    # Get mask of y (where all values are zero)
+    mask = y == 0
+    mask = ~mask
+
+    return y, mask
 
 def baby_step_mask(y, epoch):
     mask = torch.zeros_like(y)
@@ -134,9 +138,6 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
         'val_loss': []
     }
 
-    best_val_loss = np.inf
-    best_params = None
-
     for epoch in range(HP['epochs']):
         model.train()
         for i, batch in enumerate(train_dataloader):
@@ -148,14 +149,14 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
             pred_y = pred_y.squeeze(-1)
 
             # Strip time channel
-            batch_y = strip_y(batch_y)
+            batch_y, mask = strip_y(batch_y)
 
             # Get baby step mask
             baby_mask = baby_step_mask(batch_y, epoch)
 
             # Apply masks
-            pred_y = pred_y * baby_mask
-            batch_y = batch_y * baby_mask
+            pred_y = pred_y * baby_mask * mask
+            batch_y = batch_y * baby_mask * mask
 
             # Get loss
             loss = criterion(pred_y, batch_y) / len(batch_y)
@@ -179,7 +180,10 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
                 pred_y = pred_y.squeeze(-1)
 
                 # Get mask of batch_y (where all values are zero)
-                batch_y = strip_y(batch_y)
+                batch_y, mask = strip_y(batch_y)
+
+                batch_y = batch_y * mask
+                pred_y = pred_y * mask
 
                 # Get loss
                 val_loss = criterion(pred_y, batch_y) / len(batch_y)
@@ -209,7 +213,11 @@ def evaluate(model, criterion, test_dataloader, device):
             pred_y = pred_y.squeeze(-1)
 
             # Get mask of batch_y (where all values are zero)
-            batch_y = strip_y(batch_y)
+            batch_y, mask = strip_y(batch_y)
+
+            # Apply mask to pred_y
+            pred_y = pred_y * mask
+            batch_y = batch_y * mask
 
             # Get loss
             test_loss = criterion(pred_y, batch_y.long()) / len(batch_y)
@@ -230,8 +238,6 @@ def main(device):
     # Fill forward missing values
     X_train = fill_forward(X_train)
     X_test = fill_forward(X_test)
-    y_train = fill_forward(y_train)
-    y_test = fill_forward(y_test)
 
     # Change to float32
     X_train = X_train.float()

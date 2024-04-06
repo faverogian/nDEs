@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 HP = {
     'log_dir': '/logs',
     'data_path': '../../data/processed/CharacterTrajectories/regression/30',
-    'epochs': 150,
+    'epochs': 500,
     'lr': 1e-3,
     'batch_size': 32,
     'input_channels': 4,

@@ -54,7 +54,7 @@ def set_gpu_device(gpu_id):
     return device
 
 def logger(train_stats, test_loss):
-    with open(f'./{HP["log_dir"]}/log_transformer.txt', 'w') as f:
+    with open(f'./{HP["log_dir"]}/log_ncdetransformer.txt', 'w') as f:
         f.write('Hyperparameters\n')
         for key, value in HP.items():
             f.write(f'{key}: {value}\n')
@@ -107,7 +107,7 @@ def plot_trajectory(pred_y, batch_y):
     plt.ylabel('Y')
     
     # Save the plot
-    plt.savefig(f'./{HP["log_dir"]}/trajectory_tf.png')
+    plt.savefig(f'./{HP["log_dir"]}/trajectory_cdetf.png')
 
     # Explicitly close the figure
     plt.close()
@@ -230,7 +230,6 @@ def main(device):
     X_train = fill_forward(X_train)
     X_test = fill_forward(X_test)
     y_train, target_mask = preprocess_for_transformer(y_train)
-    y_test, _ = preprocess_for_transformer(y_test)
 
     # Change to float32
     X_train = X_train.float()
