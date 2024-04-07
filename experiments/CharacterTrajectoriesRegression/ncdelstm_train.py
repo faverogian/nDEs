@@ -24,6 +24,7 @@ HP = {
     'batch_size': 32,
     'input_channels': 4,
     'hidden_channels': 32,
+    'lstm_channels': 128,
     'output_channels': 3,
     'hidden_layers': 3,
     'n_heads': 4,
@@ -254,7 +255,7 @@ def main(device):
     test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=HP['batch_size'])
 
     # Define model
-    model = NeuralCDELSTM(HP['input_channels'], HP['hidden_channels'], HP['output_channels'], HP['n_layers'])
+    model = NeuralCDELSTM(HP['input_channels'], HP['hidden_channels'], HP['lstm_channels'], HP['output_channels'], HP['n_layers'])
     model.to(device)
 
     # Define loss function

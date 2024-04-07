@@ -78,16 +78,18 @@ class LSTMDecoder(nn.Module):
 # Next, we need to package CDEFunc and Transformer Decoder up into a model.
 ######################
 class NeuralCDELSTM(torch.nn.Module):
-    def __init__(self, input_channels, hidden_channels, output_channels, num_layers, interpolation="cubic"):
+    def __init__(self, input_channels, hidden_channels, lstm_channels, output_channels, num_layers, interpolation="cubic"):
         super(NeuralCDELSTM, self).__init__()
 
         self.cde_func = CDEFunc(input_channels, hidden_channels)
         self.cde_initial = torch.nn.Linear(input_channels, hidden_channels)
+        self.cde_readout = torch.nn.Linear(hidden_channels, lstm_channels)
 
-        self.decoder = LSTMDecoder(input_channels-1, hidden_channels, num_layers, output_channels)
+        self.decoder = LSTMDecoder(input_channels-1, lstm_channels, num_layers, output_channels)
 
         self.interpolation = interpolation
         self.num_layers = num_layers
+        self.lstm_channels = lstm_channels
         self.output_channels = output_channels
 
     def forward(self, coeffs):
@@ -118,6 +120,7 @@ class NeuralCDELSTM(torch.nn.Module):
 
         # Initialize decoder hidden state with encoder last hidden state
         z_T = z_T[:,1]
+        z_T = self.cde_readout(z_T)
         z_T = z_T.unsqueeze(0).expand(self.num_layers, -1, -1).contiguous()
         decoder_hidden = (z_T, z_T)
         
