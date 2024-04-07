@@ -9,7 +9,7 @@ import argparse
 import torch
 import torch.nn as nn
 import numpy as np
-from src.models.NeuralODE import NeuralODE
+from src.models.LSTMEncoderDecoder import LSTMDecoder
 
 # Set up matplotlib
 import matplotlib.pyplot as plt
@@ -19,14 +19,12 @@ HP = {
     'log_dir': '/logs',
     'data_path': '../../data/processed/ERA5',
     'epochs': 150,
-    'lr': 1e-2,
-    'batch_size': 1,
+    'lr': 1e-3,
+    'batch_size': 32,
     'input_channels': 3,
-    'hidden_channels': 64,
+    'hidden_channels': 128,
     'output_channels': 2,
-    'hidden_layers': 3,
-    'method': 'rk4',
-    'step_size': 1
+    'n_layers': 2
 }
 
 def parse_args():
@@ -50,7 +48,7 @@ def set_gpu_device(gpu_id):
     return device
 
 def logger(train_stats, test_loss):
-    with open(f'./{HP["log_dir"]}/log_ode.txt', 'w') as f:
+    with open(f'./{HP["log_dir"]}/log_lstm.txt', 'w') as f:
         f.write('Hyperparameters\n')
         for key, value in HP.items():
             f.write(f'{key}: {value}\n')
@@ -67,24 +65,12 @@ def strip_y(y):
 
     return y
 
-def baby_step_mask(y, epoch):
-    mask = torch.zeros_like(y)
-
-    progress = math.ceil(epoch/HP['epochs'])*y.size(1)
-
-    mask[:, :progress, :] = 1
-
-    return mask
-
-
 def plot_trajectory(pred_y, batch_y):
     pred_y = pred_y.squeeze().detach().cpu().numpy()
     batch_y = batch_y.squeeze().detach().cpu().numpy()
 
     pred_temp = pred_y[:, 0]
-    pred_hum = pred_y[:, 1]
     true_temp = batch_y[:, 0]
-    true_hum = batch_y[:, 1]
 
     t = np.arange(len(pred_temp))
     plt.figure(figsize=(12, 6))
@@ -98,7 +84,7 @@ def plot_trajectory(pred_y, batch_y):
     plt.legend()
     
     # Save the plot
-    plt.savefig(f'./{HP["log_dir"]}/trajectory_ode.png')
+    plt.savefig(f'./{HP["log_dir"]}/trajectory_lstm.png')
 
     # Explicitly close the figure
     plt.close()
@@ -121,17 +107,10 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
             batch_x = batch_x.to(device)
 
             # Get predictions
-            pred_y = model(batch_x)
+            pred_y = model(batch_x)[0]
 
             # Strip time channel
             batch_y = strip_y(batch_x)
-
-            # Get baby step mask
-            baby_mask = baby_step_mask(batch_y, epoch)
-
-            # Apply masks
-            pred_y = pred_y * baby_mask
-            batch_y = batch_y * baby_mask
 
             # Get loss
             loss = criterion(pred_y, batch_y) / len(batch_y)
@@ -151,7 +130,7 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
                 batch_x = batch_x.to(device)
 
                 # Get predictions
-                pred_y = model(batch_x)
+                pred_y = model(batch_x)[0]
 
                 # Get mask of batch_y (where all values are zero)
                 batch_y = strip_y(batch_x)
@@ -188,7 +167,7 @@ def evaluate(model, criterion, test_dataloader, device):
             batch_x = batch_x.to(device)
 
             # Get predictions
-            pred_y = model(batch_x)
+            pred_y = model(batch_x)[0]
 
             # Get mask of batch_y (where all values are zero)
             batch_y = strip_y(batch_x)
@@ -228,7 +207,7 @@ def main(device):
     test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=HP['batch_size'])
 
     # Define model
-    model = NeuralODE(HP['input_channels'], HP['hidden_channels'], HP['output_channels'])
+    model = LSTMDecoder(HP['input_channels'], HP['hidden_channels'], HP['n_layers'], HP['output_channels'])
     model.to(device)
 
     # Define loss function
@@ -242,7 +221,7 @@ def main(device):
     logger(history, test_loss)
 
     # Save model
-    torch.save(best_model.state_dict(), f'./{HP["log_dir"]}/node_model.pth')
+    torch.save(best_model.state_dict(), f'./{HP["log_dir"]}/lstm_model.pth')
 
 
 if __name__ == '__main__':

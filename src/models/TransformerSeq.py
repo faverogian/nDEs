@@ -16,17 +16,29 @@ class TransformerEncoder(nn.Module):
         return x
 
 class TransformerDecoder(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_heads, num_layers, dropout):
+    def __init__(self, input_dim, hidden_dim, num_heads, num_layers, dropout, output_dim=None):
         super(TransformerDecoder, self).__init__()
 
         self.embedding = nn.Linear(input_dim, hidden_dim)
         decoder_layer = nn.TransformerDecoderLayer(d_model=hidden_dim, nhead=num_heads, dropout=dropout)
         self.decoder = nn.TransformerDecoder(decoder_layer, num_layers=num_layers)
 
-    def forward(self, x, memory, tgt_key_padding_mask=None):
+        if output_dim is not None:
+            self.fc = nn.Linear(hidden_dim, output_dim)
+
+    def forward(self, x, memory=None, tgt_key_padding_mask=None):
         x = self.embedding(x)
         x = x.permute(1, 0, 2)  
+
+        if memory is None:
+            memory_shape = (x.size(0), x.size(1), x.size(2))  # Swap batch and sequence dimensions
+            memory = torch.zeros(memory_shape, dtype=x.dtype, device=x.device)
+
         x = self.decoder(x, memory, tgt_key_padding_mask=tgt_key_padding_mask)
+
+        if hasattr(self, 'fc'):
+            x = self.fc(x)
+        
         return x
 
 class Transformer(nn.Module):

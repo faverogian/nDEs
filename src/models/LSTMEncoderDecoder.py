@@ -23,7 +23,10 @@ class LSTMDecoder(nn.Module):
         self.lstm = nn.LSTM(input_dim, hidden_dim, layer_dim, batch_first=True)
         self.fc = nn.Linear(hidden_dim, output_dim)
     
-    def forward(self, x, decoder_hidden):
+    def forward(self, x, decoder_hidden=None):
+        if decoder_hidden is None:
+            decoder_hidden = (torch.zeros(self.layer_dim, x.size(0), self.hidden_dim).to(x.device),
+                              torch.zeros(self.layer_dim, x.size(0), self.hidden_dim).to(x.device))
         decoder_out, (decoder_hn, decoder_cn) = self.lstm(x, decoder_hidden)
         out = self.fc(decoder_out.squeeze(1))
         return out, (decoder_hn, decoder_cn)
@@ -47,7 +50,7 @@ class LSTMEncoderDecoder(nn.Module):
         decoder_outputs = []
         
         # Decoder loop
-        for _ in range(182-x.size(1)):
+        for _ in range(max(lengths)-x.size(1)):
             decoder_out, decoder_hidden = self.decoder(decoder_input, decoder_hidden)
             decoder_outputs.append(decoder_out)
             decoder_input = decoder_out.unsqueeze(1)
