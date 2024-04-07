@@ -21,6 +21,7 @@ class ODEFunc(torch.nn.Module):
         self.linear1 = torch.nn.Linear(hidden_channels, hidden_channels)
         self.linear2 = torch.nn.Linear(hidden_channels, hidden_channels)
         self.linear3 = torch.nn.Linear(hidden_channels, hidden_channels)
+        self.linear4 = torch.nn.Linear(hidden_channels, hidden_channels)
 
         for m in self.modules():
             if isinstance(m, torch.nn.Linear):
@@ -35,6 +36,8 @@ class ODEFunc(torch.nn.Module):
         z = self.linear2(z)
         z = z.relu()
         z = self.linear3(z)
+        z = z.relu()
+        z = self.linear4(z)
         ######################
         # Easy-to-forget gotcha: Best results tend to be obtained by adding a final tanh nonlinearity.
         ######################
@@ -43,15 +46,12 @@ class ODEFunc(torch.nn.Module):
         return z
     
 class NeuralODE(torch.nn.Module):
-    def __init__(self, input_channels, hidden_channels, output_channels, missing_data, interpolation="cubic"):
+    def __init__(self, input_channels, hidden_channels, output_channels):
         super(NeuralODE, self).__init__()
 
         self.ode_func = ODEFunc(hidden_channels, hidden_channels)
         self.ode_initial = torch.nn.Linear(input_channels, hidden_channels)
         self.ode_readout = torch.nn.Linear(hidden_channels, output_channels)
-
-        self.interpolation = interpolation
-        self.missing_data = missing_data
 
     def forward(self, x):
         # x = (batch, length, input_channels)
