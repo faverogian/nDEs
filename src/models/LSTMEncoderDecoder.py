@@ -39,7 +39,7 @@ class LSTMEncoderDecoder(nn.Module):
         
         # Initialize decoder hidden state with encoder last hidden state
         decoder_hidden = encoder_hidden
-        
+
         # Initialize decoder input with zeros
         decoder_input = torch.zeros(x.size(0), 1, x.size(2)-1).to(x.device)
         
