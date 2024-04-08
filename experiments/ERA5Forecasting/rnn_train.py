@@ -9,7 +9,7 @@ import argparse
 import torch
 import torch.nn as nn
 import numpy as np
-from src.models.LSTMEncoderDecoder import LSTMDecoder
+from src.models.RNNDecoder import RNNDecoder
 
 # Set up matplotlib
 import matplotlib.pyplot as plt
@@ -48,7 +48,7 @@ def set_gpu_device(gpu_id):
     return device
 
 def logger(train_stats, test_loss):
-    with open(f'./{HP["log_dir"]}/log_lstm.txt', 'w') as f:
+    with open(f'./{HP["log_dir"]}/log_rnn.txt', 'w') as f:
         f.write('Hyperparameters\n')
         for key, value in HP.items():
             f.write(f'{key}: {value}\n')
@@ -84,7 +84,7 @@ def plot_trajectory(pred_y, batch_y):
     plt.legend()
     
     # Save the plot
-    plt.savefig(f'./{HP["log_dir"]}/trajectory_lstm.png')
+    plt.savefig(f'./{HP["log_dir"]}/trajectory_rnn.png')
 
     # Explicitly close the figure
     plt.close()
@@ -207,7 +207,7 @@ def main(device):
     test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=HP['batch_size'])
 
     # Define model
-    model = LSTMDecoder(HP['input_channels'], HP['hidden_channels'], HP['n_layers'], HP['output_channels'])
+    model = RNNDecoder(HP['input_channels'], HP['hidden_channels'], HP['n_layers'], HP['output_channels'])
     model.to(device)
 
     # Define loss function
@@ -221,7 +221,7 @@ def main(device):
     logger(history, test_loss)
 
     # Save model
-    torch.save(best_model.state_dict(), f'./{HP["log_dir"]}/lstm_model.pth')
+    torch.save(best_model.state_dict(), f'./{HP["log_dir"]}/rnn_model.pth')
 
 
 if __name__ == '__main__':

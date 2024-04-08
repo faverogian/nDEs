@@ -18,13 +18,13 @@ import matplotlib.pyplot as plt
 HP = {
     'log_dir': '/logs',
     'data_path': '../../data/processed/ERA5',
-    'epochs': 250,
+    'epochs': 50,
     'lr': 1e-3,
     'batch_size': 1,
     'input_channels': 3,
-    'hidden_channels': 64,
+    'hidden_channels': 16,
     'output_channels': 2,
-    'hidden_layers': 3,
+    'hidden_layers': 2,
     'method': 'rk4',
     'step_size': 1
 }
