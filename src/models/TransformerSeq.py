@@ -40,6 +40,15 @@ class TransformerDecoder(nn.Module):
             x = self.fc(x)
         
         return x
+    
+    def autoregressive_predict(self, x, memory=None, tgt_key_padding_mask=None, max_len=23):
+        for i in range(max_len):
+            x_i = self.forward(x, memory, tgt_key_padding_mask)
+            x_i = x_i[-1:, :, :]
+            x_i = x_i.permute(1, 0, 2)
+            x = torch.cat([x, x_i], dim=1)
+        return x
+
 
 class Transformer(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, num_heads, num_layers, dropout):

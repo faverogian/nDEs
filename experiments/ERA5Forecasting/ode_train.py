@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 HP = {
     'log_dir': '/logs',
     'data_path': '../../data/processed/ERA5',
-    'epochs': 150,
+    'epochs': 250,
     'lr': 1e-3,
     'batch_size': 1,
     'input_channels': 3,

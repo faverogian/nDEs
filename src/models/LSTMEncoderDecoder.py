@@ -30,6 +30,17 @@ class LSTMDecoder(nn.Module):
         decoder_out, (decoder_hn, decoder_cn) = self.lstm(x, decoder_hidden)
         out = self.fc(decoder_out.squeeze(1))
         return out, (decoder_hn, decoder_cn)
+    
+    def autoregressive_predict(self, x, max_len):
+        decoder_hidden = None
+        decoder_input = x
+        decoder_outputs = []
+        for _ in range(max_len):
+            decoder_out, decoder_hidden = self(decoder_input, decoder_hidden)
+            decoder_outputs.append(decoder_out)
+            decoder_input = decoder_out.unsqueeze(1)
+        return torch.stack(decoder_outputs, dim=1)
+    
 
 class LSTMEncoderDecoder(nn.Module):
     def __init__(self, input_dim, hidden_dim, layer_dim, output_dim):

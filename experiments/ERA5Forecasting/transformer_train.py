@@ -18,10 +18,10 @@ import matplotlib.pyplot as plt
 HP = {
     'log_dir': '/logs',
     'data_path': '../../data/processed/ERA5',
-    'epochs': 150,
+    'epochs': 250,
     'lr': 1e-3,
     'batch_size': 32,
-    'input_channels': 3,
+    'input_channels': 2,
     'hidden_channels': 32,
     'output_channels': 2,
     'hidden_layers': 3,
@@ -74,18 +74,37 @@ def plot_trajectory(pred_y, batch_y):
 
     pred_temp = pred_y[:, 0]
     true_temp = batch_y[:, 0]
+    pred_humidity = pred_y[:, 1]
+    true_humidity = batch_y[:, 1]
 
     t = np.arange(len(pred_temp))
-    plt.figure(figsize=(12, 6))
-    plt.scatter(t, pred_temp, label='Predicted temperature')
-    plt.scatter(t, true_temp, label='True temperature')
-    plt.plot(t, pred_temp, label='Predicted temperature')
-    plt.plot(t, true_temp, label='True temperature')
-    plt.xlabel('Bi-Monthly Time Step')
-    plt.ylabel('Norm Value')
-    plt.title('One-Year Temperature Forecast')
-    plt.legend()
-    
+
+    # Create subplots
+    fig, axes = plt.subplots(2, 1, figsize=(12, 12))
+
+    # Plot temperature
+    axes[0].scatter(t, pred_temp, label='Predicted temperature', color='red')
+    axes[0].scatter(t, true_temp, label='True temperature', color='blue')
+    axes[0].plot(t, pred_temp, color='red', alpha=0.5)
+    axes[0].plot(t, true_temp, color='blue', alpha=0.5)
+    axes[0].set_xlabel('Bi-Monthly Time Step')
+    axes[0].set_ylabel('Norm Value')
+    axes[0].set_title('Temperature Trajectory')
+    axes[0].legend()
+
+    # Plot humidity
+    axes[1].scatter(t, pred_humidity, label='Predicted humidity', color='green')
+    axes[1].scatter(t, true_humidity, label='True humidity', color='orange')
+    axes[1].plot(t, pred_humidity, color='green', alpha=0.5)
+    axes[1].plot(t, true_humidity, color='orange', alpha=0.5)
+    axes[1].set_xlabel('Bi-Monthly Time Step')
+    axes[1].set_ylabel('Norm Value')
+    axes[1].set_title('Humidity Trajectory')
+    axes[1].legend()
+
+    # Adjust layout
+    plt.tight_layout()
+
     # Save the plot
     plt.savefig(f'./{HP["log_dir"]}/trajectory_transformer.png')
 
@@ -109,12 +128,11 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
             batch_x = batch[0]
             batch_x = batch_x.to(device)
 
-            # Get predictions
-            pred_y = model(batch_x)
-            pred_y = pred_y.permute(1, 0, 2)
-
             # Strip time channel
             batch_y = strip_y(batch_x)
+            y0 = batch_y[:, 0, :].unsqueeze(1)
+
+            pred_y = model.autoregressive_predict(y0, max_len=23)
 
             # Get loss
             loss = criterion(pred_y, batch_y) / len(batch_y)
@@ -133,12 +151,11 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
                 batch_x = batch[0]
                 batch_x = batch_x.to(device)
 
-                # Get predictions
-                pred_y = model(batch_x)
-                pred_y = pred_y.permute(1, 0, 2)
-
-                # Get mask of batch_y (where all values are zero)
+                # Strip time channel
                 batch_y = strip_y(batch_x)
+                y0 = batch_y[:, 0, :].unsqueeze(1)
+
+                pred_y = model.autoregressive_predict(y0, max_len=23)
 
                 # Get loss
                 val_loss = criterion(pred_y, batch_y) / len(batch_y)
@@ -171,12 +188,11 @@ def evaluate(model, criterion, test_dataloader, device):
             batch_x = batch[0]
             batch_x = batch_x.to(device)
 
-            # Get predictions
-            pred_y = model(batch_x)
-            pred_y = pred_y.permute(1, 0, 2)
-
-            # Get mask of batch_y (where all values are zero)
+            # Strip time channel
             batch_y = strip_y(batch_x)
+            y0 = batch_y[:, 0, :].unsqueeze(1)
+
+            pred_y = model.autoregressive_predict(y0, max_len=23)        
 
             # Get loss
             test_loss = criterion(pred_y, batch_y.long()) / len(batch_y)

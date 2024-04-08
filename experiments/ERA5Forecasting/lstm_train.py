@@ -18,10 +18,10 @@ import matplotlib.pyplot as plt
 HP = {
     'log_dir': '/logs',
     'data_path': '../../data/processed/ERA5',
-    'epochs': 150,
+    'epochs': 250,
     'lr': 1e-3,
     'batch_size': 32,
-    'input_channels': 3,
+    'input_channels': 2,
     'hidden_channels': 128,
     'output_channels': 2,
     'n_layers': 2
@@ -106,11 +106,11 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
             batch_x = batch[0]
             batch_x = batch_x.to(device)
 
-            # Get predictions
-            pred_y = model(batch_x)[0]
-
-            # Strip time channel
             batch_y = strip_y(batch_x)
+            y0 = batch_y[:, 0, :].unsqueeze(1)
+
+            # Get predictions
+            pred_y = model.autoregressive_predict(y0, batch_y.size(1))
 
             # Get loss
             loss = criterion(pred_y, batch_y) / len(batch_y)
@@ -129,11 +129,11 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
                 batch_x = batch[0]
                 batch_x = batch_x.to(device)
 
-                # Get predictions
-                pred_y = model(batch_x)[0]
-
-                # Get mask of batch_y (where all values are zero)
                 batch_y = strip_y(batch_x)
+                y0 = batch_y[:, 0, :].unsqueeze(1)
+
+                # Get predictions
+                pred_y = model.autoregressive_predict(y0, batch_y.size(1))
 
                 # Get loss
                 val_loss = criterion(pred_y, batch_y) / len(batch_y)
@@ -166,11 +166,11 @@ def evaluate(model, criterion, test_dataloader, device):
             batch_x = batch[0]
             batch_x = batch_x.to(device)
 
-            # Get predictions
-            pred_y = model(batch_x)[0]
-
-            # Get mask of batch_y (where all values are zero)
             batch_y = strip_y(batch_x)
+            y0 = batch_y[:, 0, :].unsqueeze(1)
+
+            # Get predictions
+            pred_y = model.autoregressive_predict(y0, batch_y.size(1))
 
             # Get loss
             test_loss = criterion(pred_y, batch_y.long()) / len(batch_y)
