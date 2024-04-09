@@ -85,11 +85,11 @@ def preprocess_for_transformer(X):
     # Convert NaN values to a special token
     input_ids = torch.nan_to_num(X, nan=0)  # Replace NaN with 0
 
-    # Create attention mask
-    attention_mask = (X[:, :, 0] == 0)
+    # Create a SOS token (55) for the start of the sequence
+    sos_token = torch.zeros(X.shape[0], 1, X.shape[2])
+    sos_token[:, :, :] = 55
+    print(sos_token)
     
-    return input_ids, attention_mask
-
 
 def fill_forward(X):
     '''

@@ -10,7 +10,7 @@ import torch.nn as nn
 import torchcde
 import numpy as np
 from src.models.TransformerSeq import Transformer
-from src.data.cde_transforms import preprocess_for_transformer
+from src.data.transforms import preprocess_for_transformer
 
 # Set up matplotlib
 import matplotlib.pyplot as plt

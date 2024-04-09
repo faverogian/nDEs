@@ -10,7 +10,7 @@ import torch.nn as nn
 import torchcde
 import numpy as np
 from src.models.NeuralCDETransformer import NeuralCDETransformer
-from src.data.cde_transforms import preprocess_for_transformer, fill_forward
+from src.data.transforms import preprocess_for_transformer, fill_forward
 
 # Set up matplotlib
 import matplotlib.pyplot as plt
