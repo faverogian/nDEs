@@ -71,25 +71,60 @@ def preprocess_for_transformer(X):
     X : torch.Tensor
         The input data with missingness inserted as NaNs across the datapoint.
         A cumulative mask channel is concatenated to the input data to indicate
-        missingness. Shape (n_samples, sequence_length, n_features + 1)
+        missingness. Shape (n_samples, sequence_length, n_features)
 
     Returns
     -------
     input_ids : torch.Tensor
-        The input tensor for the transformer model with special tokens for NaN values.
-        Shape (n_samples, sequence_length, n_features + 1)
-    attention_mask : torch.Tensor
-        The attention mask tensor indicating the padding positions.
-        Shape (n_samples, sequence_length)
+        The input tensor for the transformer model with SOS and EOS added.
+        Shape (n_samples, sequence_length, n_features)
     """
     # Convert NaN values to a special token
     input_ids = torch.nan_to_num(X, nan=0)  # Replace NaN with 0
 
     # Create a SOS token (55) for the start of the sequence
     sos_token = torch.zeros(X.shape[0], 1, X.shape[2])
-    sos_token[:, :, :] = 55
-    print(sos_token)
+    sos_token[:, :, :] = 5
     
+    # Concatenate the SOS token to the start of the sequence
+    input_ids = torch.cat((sos_token, input_ids), dim=1)
+
+    # Create an EOS token (56) for the end of the sequence
+    eos_token = 6
+
+    # Create a padding mask
+    padding_mask = input_ids[:, :, 0] != 0
+
+    # Get list of eos ids
+    eos_ids = (padding_mask.sum(dim=1) + 1)
+    for i in range(input_ids.shape[0]):
+        try:
+            input_ids[i, eos_ids[i], :] = eos_token
+        except IndexError:
+            input_ids[i, -1, :] = eos_token
+
+    return input_ids
+
+
+def get_padding_mask(X):
+    """
+    Get the padding mask for the transformer model.
+
+    Parameters
+    ----------
+    X : torch.Tensor
+
+    Returns
+    -------
+    padding_mask : torch.Tensor
+        The padding mask for the transformer model. Shape (n_samples, sequence_length)
+    """
+    # Create a padding mask where all zeros are given a value of 1
+    padding_mask = X[:, :, 0] == 0
+    padding_mask = padding_mask.bool()
+
+    return padding_mask
+
 
 def fill_forward(X):
     '''

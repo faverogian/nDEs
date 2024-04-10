@@ -7,10 +7,9 @@ sys.path.append(str(_here / '../../'))
 import argparse
 import torch
 import torch.nn as nn
-import torchcde
 import numpy as np
 from src.models.TransformerSeq import Transformer
-from src.data.transforms import preprocess_for_transformer
+from src.data.transforms import preprocess_for_transformer, get_padding_mask
 
 # Set up matplotlib
 import matplotlib.pyplot as plt
@@ -20,12 +19,11 @@ HP = {
     'log_dir': '/logs',
     'data_path': '../../data/processed/CharacterTrajectories/regression/30',
     'epochs': 500,
-    'lr': 1e-3,
+    'lr': 1e-4,
     'batch_size': 32,
-    'input_channels': 4,
+    'input_channels': 3,
     'hidden_channels': 32,
     'output_channels': 3,
-    'hidden_layers': 3,
     'n_heads': 4,
     'n_layers': 3,
     'dropout': 0.1
@@ -70,6 +68,7 @@ def strip_y(y):
     # Get mask of y (where all values are zero)
     mask = y == 0
     mask = ~mask
+    mask = mask[:,1:,:]
 
     return y, mask
 
@@ -120,61 +119,80 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
 
     best_val_loss = np.inf
     best_params = None
+    patience = 0
 
     for epoch in range(HP['epochs']):
         model.train()
+        train_losses = []
         for i, batch in enumerate(train_dataloader):
-            batch_x, batch_mask, batch_y, target_mask = batch
-            batch_x, batch_mask, batch_y, target_mask = batch_x.to(device), batch_mask.to(device), batch_y.to(device), target_mask.to(device)
-
-            # Get predictions
-            pred_y = model(batch_x, batch_y, batch_mask, target_mask)
-            pred_y = pred_y.squeeze(-1)
-            pred_y = pred_y.permute(1, 0, 2)
-
-            # Get mask of batch_y (where all values are zero)
+            batch_x, batch_y = batch
+            batch_x, _ = strip_y(batch_x)
             batch_y, mask = strip_y(batch_y)
+            batch_x, batch_y, mask = batch_x.to(device), batch_y.to(device), mask.to(device)
 
-            # Apply mask to pred_y
-            pred_y = pred_y * mask
+            # Offset batch_y by one time step
+            y_input = batch_y[:,:-1,:]
+            y_target = batch_y[:,1:,:]
+
+            # Make masks
+            src_padding_mask = model.get_padding_mask(batch_x).to(device)
+            tgt_padding_mask = model.get_padding_mask(y_input).to(device)
+            tgt_mask = model.get_causal_mask(y_input.shape[1]).to(device)
+            
+            # Get predictions
+            pred_y = model(src=batch_x, 
+                           tgt=y_input, 
+                           tgt_mask=tgt_mask, 
+                           src_padding_mask=src_padding_mask, 
+                           tgt_padding_mask=tgt_padding_mask)
+            pred_y = pred_y.permute(1, 0, 2) * mask
 
             # Get loss
-            loss = criterion(pred_y, batch_y) / len(batch_y)
+            loss = criterion(pred_y, y_target) / len(batch_y)
+            train_losses.append(loss.item())
 
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
 
-        print('Epoch: {}   Training loss: {}'.format(epoch, loss.item()))
+        print('Epoch: {}   Training loss: {}'.format(epoch, np.mean(train_losses)))
 
         model.eval()
 
         with torch.no_grad():
             val_losses = []
             for i, batch in enumerate(val_dataloader):
-                batch_x, batch_mask, batch_y = batch
-                batch_x, batch_mask, batch_y = batch_x.to(device), batch_mask.to(device), batch_y.to(device)
-
-                # Get predictions
-                pred_y = model(batch_x, batch_y, batch_mask)
-                pred_y = pred_y.squeeze(-1)
-                pred_y = pred_y.permute(1, 0, 2)
-
-                # Get mask of batch_y (where all values are zero)
+                batch_x, batch_y = batch
+                batch_x, _ = strip_y(batch_x)
                 batch_y, mask = strip_y(batch_y)
+                batch_x, batch_y, mask = batch_x.to(device), batch_y.to(device), mask.to(device)
 
-                # Apply mask to pred_y
-                pred_y = pred_y * mask
+                # Offset batch_y by one time step
+                y_input = batch_y[:,:-1,:]
+                y_target = batch_y[:,1:,:]
+
+                # Make masks
+                src_padding_mask = model.get_padding_mask(batch_x).to(device)
+                tgt_padding_mask = model.get_padding_mask(y_input).to(device)
+                tgt_mask = model.get_causal_mask(y_input.shape[1]).to(device)
+                
+                # Get predictions
+                pred_y = model(src=batch_x, 
+                            tgt=y_input, 
+                            tgt_mask=tgt_mask, 
+                            src_padding_mask=src_padding_mask, 
+                            tgt_padding_mask=tgt_padding_mask)
+                pred_y = pred_y.permute(1, 0, 2) * mask
 
                 # Get loss
-                val_loss = criterion(pred_y, batch_y) / len(batch_y)
+                val_loss = criterion(pred_y, y_target) / len(batch_y)
 
                 val_losses.append(val_loss.item())
 
             print('Validation loss: {}'.format(np.mean(val_losses)))
 
         if epoch % 10 == 0:
-            plot_trajectory(pred_y, batch_y)
+            plot_trajectory(pred_y, y_target)
         
         # Update history
         history['train_loss'].append(loss.item())
@@ -185,6 +203,15 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
             best_val_loss = np.mean(val_losses)
             best_params = model.state_dict()
 
+        # Check for early stopping
+        if epoch > 50:
+            if np.mean(val_losses) > np.mean(history['val_loss'][-50:]):
+                patience += 1
+                if patience == 10:
+                    break
+            else:
+                patience = 0
+
     model.load_state_dict(best_params)
 
     return history, model
@@ -194,22 +221,30 @@ def evaluate(model, criterion, test_dataloader, device):
     with torch.no_grad():
         test_losses = []
         for i, batch in enumerate(test_dataloader):
-            batch_x, batch_mask, batch_y = batch
-            batch_x, batch_mask, batch_y = batch_x.to(device), batch_mask.to(device), batch_y.to(device)
-
-            # Get predictions
-            pred_y = model(batch_x, batch_y, batch_mask)
-            pred_y = pred_y.squeeze(-1)
-            pred_y = pred_y.permute(1, 0, 2)
-
-            # Get mask of batch_y (where all values are zero)
+            batch_x, batch_y = batch
+            batch_x, _ = strip_y(batch_x)
             batch_y, mask = strip_y(batch_y)
+            batch_x, batch_y, mask = batch_x.to(device), batch_y.to(device), mask.to(device)
 
-            # Apply mask to pred_y
-            pred_y = pred_y * mask
+            # Offset batch_y by one time step
+            y_input = batch_y[:,:-1,:]
+            y_target = batch_y[:,1:,:]
+
+            # Make masks
+            src_padding_mask = model.get_padding_mask(batch_x).to(device)
+            tgt_padding_mask = model.get_padding_mask(y_input).to(device)
+            tgt_mask = model.get_causal_mask(y_input.shape[1]).to(device)
+            
+            # Get predictions
+            pred_y = model(src=batch_x, 
+                           tgt=y_input, 
+                           tgt_mask=tgt_mask, 
+                           src_padding_mask=src_padding_mask, 
+                           tgt_padding_mask=tgt_padding_mask)
+            pred_y = pred_y.permute(1, 0, 2) * mask
 
             # Get loss
-            test_loss = criterion(pred_y, batch_y) / len(batch_y)
+            test_loss = criterion(pred_y, y_target) / len(batch_y)
 
             test_losses.append(test_loss.item())
 
@@ -225,9 +260,9 @@ def main(device):
     y_test = torch.load(f'{HP["data_path"]}/y_test.pt')
 
     # Preprocess data
-    X_train, train_mask = preprocess_for_transformer(X_train)
-    y_train, target_mask = preprocess_for_transformer(y_train)
-    X_test, test_mask = preprocess_for_transformer(X_test)
+    X_train = preprocess_for_transformer(X_train)
+    y_train = preprocess_for_transformer(y_train)
+    X_test = preprocess_for_transformer(X_test)
 
     # Change to float32
     X_train = X_train.float()
@@ -239,23 +274,26 @@ def main(device):
     val_size = int(0.2 * len(X_train))
     X_train, X_val = X_train[:-val_size], X_train[-val_size:]
     y_train, y_val = y_train[:-val_size], y_train[-val_size:]
-    train_mask, val_mask = train_mask[:-val_size], train_mask[-val_size:]
-    target_mask = target_mask[:-val_size]
 
     # Set up train dataloader
-    train_dataset = torch.utils.data.TensorDataset(X_train, train_mask, y_train, target_mask)
+    train_dataset = torch.utils.data.TensorDataset(X_train, y_train)
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=HP['batch_size'])
 
     # Set up validation dataloader
-    val_dataset = torch.utils.data.TensorDataset(X_val, val_mask, y_val)
+    val_dataset = torch.utils.data.TensorDataset(X_val, y_val)
     val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=HP['batch_size'])
 
     # Set up test dataloader
-    test_dataset = torch.utils.data.TensorDataset(X_test, test_mask, y_test)
+    test_dataset = torch.utils.data.TensorDataset(X_test, y_test)
     test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=HP['batch_size'])
 
     # Define model
-    model = Transformer(HP['input_channels'], HP['hidden_channels'], HP['output_channels'], HP['n_heads'], HP['n_layers'], HP['dropout'])
+    model = Transformer(input_dim=HP['input_channels'], 
+                        hidden_dim=HP['hidden_channels'], 
+                        output_dim=HP['output_channels'], 
+                        num_heads=HP['n_heads'], 
+                        num_layers=HP['n_layers'], 
+                        dropout=HP['dropout'])
     model.to(device)
 
     # Define loss function

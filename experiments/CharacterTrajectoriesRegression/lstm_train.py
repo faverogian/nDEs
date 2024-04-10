@@ -69,7 +69,7 @@ def strip_y(y):
 
     return y, mask
 
-def getLenghts(inputs):
+def getLengths(inputs):
     # inputs is a tensor of size (batch, sequence_length, input_channels)
     # returns a list of size batch, indicating the true sequence length of each batch
     lengths = []
@@ -137,7 +137,7 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
             batch_x, batch_y = batch
             batch_x, batch_y  = batch_x.to(device), batch_y.to(device)
 
-            lengths = getLenghts(batch_x)
+            lengths = getLengths(batch_x)
 
             # Get predictions
             pred_y = model(batch_x, lengths)
@@ -166,7 +166,7 @@ def train_loop(model, criterion, optimizer, train_dataloader, val_dataloader, de
                 batch_x, batch_y = batch
                 batch_x, batch_y = batch_x.to(device), batch_y.to(device)
 
-                lengths = getLenghts(batch_x)
+                lengths = getLengths(batch_x)
 
                 # Get predictions
                 pred_y = model(batch_x, lengths)
@@ -209,7 +209,7 @@ def evaluate(model, criterion, test_dataloader, device):
             batch_x, batch_y = batch
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
 
-            lengths = getLenghts(batch_x)
+            lengths = getLengths(batch_x)
         
             # Get predictions
             pred_y = model(batch_x, lengths)
@@ -238,9 +238,9 @@ def main(device):
     y_test = torch.load(f'{HP["data_path"]}/y_test.pt')
 
     # Preprocess data
-    X_train, _ = preprocess_for_transformer(X_train)
-    y_train, _ = preprocess_for_transformer(y_train)
-    X_test, _ = preprocess_for_transformer(X_test)
+    X_train = preprocess_for_transformer(X_train)
+    y_train = preprocess_for_transformer(y_train)
+    X_test = preprocess_for_transformer(X_test)
 
     # Change to float32
     X_train = X_train.float()
