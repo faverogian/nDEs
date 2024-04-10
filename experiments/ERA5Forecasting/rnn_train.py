@@ -9,7 +9,7 @@ import argparse
 import torch
 import torch.nn as nn
 import numpy as np
-from src.models.RNNDecoder import RNNDecoder
+from src.models.RNN import RNNDecoder
 
 # Set up matplotlib
 import matplotlib.pyplot as plt

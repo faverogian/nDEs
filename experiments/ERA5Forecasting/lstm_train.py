@@ -9,7 +9,7 @@ import argparse
 import torch
 import torch.nn as nn
 import numpy as np
-from src.models.LSTMEncoderDecoder import LSTMDecoder
+from src.models.LSTM import LSTMDecoder
 
 # Set up matplotlib
 import matplotlib.pyplot as plt

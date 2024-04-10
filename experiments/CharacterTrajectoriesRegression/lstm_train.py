@@ -8,7 +8,7 @@ import argparse
 import torch
 import torch.nn as nn
 import numpy as np
-from src.models.LSTMEncoderDecoder import LSTMEncoderDecoder
+from src.models.LSTM import LSTMEncoderDecoder
 from src.data.transforms import preprocess_for_transformer
 
 # Set up matplotlib
