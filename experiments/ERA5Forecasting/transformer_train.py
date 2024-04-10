@@ -9,7 +9,7 @@ import argparse
 import torch
 import torch.nn as nn
 import numpy as np
-from src.models.TransformerSeq import TransformerDecoder
+from src.models.Transformer import TransformerDecoder
 
 # Set up matplotlib
 import matplotlib.pyplot as plt

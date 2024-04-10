@@ -8,7 +8,7 @@ import argparse
 import torch
 import torch.nn as nn
 import numpy as np
-from src.models.TransformerSeq import Transformer
+from src.models.Transformer import Transformer
 from src.data.transforms import preprocess_for_transformer, get_padding_mask
 
 # Set up matplotlib

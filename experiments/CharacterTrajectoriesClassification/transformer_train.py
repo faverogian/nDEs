@@ -9,16 +9,16 @@ import torch
 import torch.nn as nn
 import torchcde
 import numpy as np
-from src.models.Transformer import Transformer
-from src.data.transforms import insert_random_missingness, preprocess_for_transformer
+from src.models.Transformer import TransformerClassifier
+from src.data.transforms import insert_random_missingness, preprocess_for_transformerC
 
 # Define hyperparameters
 HP = {
     'log_dir': '/logs',
     'data_path': '../../data/processed/CharacterTrajectories/classification',
-    'missing_rate': 0.5,
+    'missing_rate': 0.75,
     'epochs': 500,
-    'lr': 1e-3,
+    'lr': 1e-4,
     'batch_size': 32,
     'input_channels': 5,
     'hidden_channels': 32,
@@ -166,8 +166,8 @@ def main(device):
     X_test = insert_random_missingness(X_test, HP['missing_rate'])
 
     # Preprocess for transformer
-    X_train, train_mask = preprocess_for_transformer(X_train)
-    X_test, test_mask = preprocess_for_transformer(X_test)
+    X_train, train_mask = preprocess_for_transformerC(X_train)
+    X_test, test_mask = preprocess_for_transformerC(X_test)
 
     # Change to float32
     X_train = X_train.float()
@@ -194,7 +194,12 @@ def main(device):
     test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=HP['batch_size'])
 
     # Define model
-    model = Transformer(HP['input_channels'], HP['hidden_channels'], HP['hidden_layers'], HP['output_channels'], HP['n_heads'], HP['dropout'])
+    model = TransformerClassifier(input_dim=HP['input_channels'], 
+                               hidden_dim=HP['hidden_channels'], 
+                               layer_dim=HP['hidden_layers'], 
+                               output_dim=HP['output_channels'], 
+                               num_heads=HP['n_heads'], 
+                               dropout=HP['dropout'])
     model.to(device)
 
     # Define loss function
