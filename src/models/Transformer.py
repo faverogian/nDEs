@@ -103,11 +103,15 @@ class TransformerDecoder(nn.Module):
     def forward(self, x, memory=None):
         causal_mask = self.make_causal_mask(x).to(x.device)
         key_padding_mask = self.get_padding_mask(x).to(x.device)
-        x = self.embedding(x) * math.sqrt(self.hidden_dim)
+        x = self.embedding(x) #* math.sqrt(self.hidden_dim)
         x = self.pos_encoder(x)
         x = x.permute(1, 0, 2)  
 
-        x = self.decoder(x, memory, tgt_mask=causal_mask, tgt_key_padding_mask=key_padding_mask)
+        if memory is None:
+            memory_shape = (x.size(0), x.size(1), x.size(2))  # Swap batch and sequence dimensions
+            memory = torch.zeros(memory_shape, dtype=x.dtype, device=x.device)
+
+        x = self.decoder(x, memory)
 
         if hasattr(self, 'fc'):
             x = self.fc(x)
