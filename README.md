@@ -10,10 +10,13 @@
 
 ---
 
-## Table of Contents
-- [Repository](#repository)
-- [Installation](#installation)
-- [Contact](#contact)
+In this study, we conduct a comparative analysis of sequential models for
+time-series data, focusing on nDEs (both Neural Controlled Differential Equations (nCDE) and Neural Ordinary Differential Equations (nODE))
+alongside modern discrete methods like LSTM networks, RNNs, and Transformers. Specifically, we compare their performance in tasks involving the classification of Latin characters (Encoder Task), forecasting of Latin characters (Sequence-to-Sequence Task), and forecasting of weather (Decoder Task). 
+
+The nCDE model outperforms Transformer, LSTM, and RNN baselines in Latin character classification, with fewer parameters, while in sequence-to-sequence tasks, the Transformer model excels due to self-attention, and the nCDE-nODE model achieves comparable performance with fewer parameters, although self-attention-based models better capture intricate details. In the decoding task, the nODE model performs slightly below RNN and LSTM models in terms of MSE but uses significantly fewer parameters. 
+
+Our investigation revealed nDE’s remarkable ability to handle irregularly sampled data with superior memory efficiency. However, their slower computation speed and limitations in real-time settings pose challenges. Nonetheless, nDEs offer continuous representations of time series, excel on irregularly sampled data, and exhibit memory efficiency, making them compelling options in resource-constrained scenarios.
 
 ## Repository
 
@@ -38,7 +41,7 @@ This repository is structured as follows:
 
 ## Installation
 
-All required packages in ```requirements.txt can be installed via ```pip.
+All required packages in ```requirements.txt``` can be installed via ```pip```.
 
 ## Contact
 
