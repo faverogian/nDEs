@@ -26,8 +26,7 @@ This repository is structured as follows:
   - `models/`: Scripts for defining and training ML models.
   - `evaluation/`: Scripts for model evaluation, metrics, and visualization.
   - `utils/`: Utility scripts and helper functions.
-- **`experiments/`**: Directory for experiment tracking.
-- **`reports/`**: Project reports, documentation, and presentations.
-  - `figures/`: Figures and visualizations for reports and presentations.
+- **`experiments/`**: Directory for experiment scripts and logs.
+- **`report/`**: Project figures and visualizations for reports and presentations.
 - **`requirements.txt`**: Python dependencies file.
 - **`README.md`**: Overview of the project, setup instructions, and usage guide.
