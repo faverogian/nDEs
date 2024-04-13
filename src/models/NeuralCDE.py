@@ -18,7 +18,6 @@ import torchcde
 #
 # Where X is your data and f_\theta is a neural network. So the first thing we need to do is define such an f_\theta.
 # That's what this CDEFunc class does.
-# Here we've built a small single-hidden-layer neural network, whose hidden layer is of width 128.
 ######################
 class CDEFunc(torch.nn.Module):
     def __init__(self, input_channels, hidden_channels):
@@ -30,12 +29,10 @@ class CDEFunc(torch.nn.Module):
         self.input_channels = input_channels
         self.hidden_channels = hidden_channels
 
-        self.linear1 = torch.nn.Linear(hidden_channels, 256)
-        self.linear2 = torch.nn.Linear(256, 128)
-        self.linear3 = torch.nn.Linear(128, 64)
-        self.linear4 = torch.nn.Linear(64, input_channels * hidden_channels)
-
-        self.dropout = torch.nn.Dropout(0.3)
+        self.linear1 = torch.nn.Linear(hidden_channels, hidden_channels)
+        self.linear2 = torch.nn.Linear(hidden_channels, hidden_channels)
+        self.linear3 = torch.nn.Linear(hidden_channels, hidden_channels)
+        self.linear4 = torch.nn.Linear(hidden_channels, input_channels * hidden_channels)
 
     ######################
     # For most purposes the t argument can probably be ignored; unless you want your CDE to behave differently at
@@ -45,10 +42,8 @@ class CDEFunc(torch.nn.Module):
         # z has shape (batch, hidden_channels)
         z = self.linear1(z)
         z = z.relu()
-        z = self.dropout(z)
         z = self.linear2(z)
         z = z.relu()
-        z = self.dropout(z)
         z = self.linear3(z)
         z = z.relu()
         z = self.linear4(z)
@@ -96,7 +91,10 @@ class NeuralCDE(torch.nn.Module):
         z_T = torchcde.cdeint(X=X,
                               z0=z0,
                               func=self.func,
-                              t=X.interval)
+                              adjoint=True,
+                              t=X.interval,
+                              method='rk4',
+                              options={'step_size': 1})
 
         ######################
         # Both the initial value and the terminal value are returned from cdeint; extract just the terminal value,
