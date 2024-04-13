@@ -18,6 +18,8 @@ The nCDE model outperforms Transformer, LSTM, and RNN baselines in Latin charact
 
 Our investigation revealed nDE’s remarkable ability to handle irregularly sampled data with superior memory efficiency. However, their slower computation speed and limitations in real-time settings pose challenges. Nonetheless, nDEs offer continuous representations of time series, excel on irregularly sampled data, and exhibit memory efficiency, making them compelling options in resource-constrained scenarios.
 
+The full paper can be seen [here](https://github.com/faverogian/nDEs/report/report.pdf).
+
 ## Repository
 
 This repository is structured as follows:
