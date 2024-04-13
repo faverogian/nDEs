@@ -25,3 +25,7 @@ For irregular sampling experiments, it is recommended to create custom transform
 The training data is of shape (batch, seq_length, channels), where the first 2/3 of the original sequence is kept, and the rest is zero padding. An identical time channel is added and the same normalization method is applied. The labels are the remaining 1/3 of the original sequence, with the rest padded with zeros. 
 
 To accommodate the data for each model, similar methods need to be enforced as in classification (fill forward for torchcde). Either the same custom transform methods can be applied again (with an option to not mask any values). 
+
+### ERA5 - Forecasting
+
+The training data is of shape (batch, seq_length, channels). A time channel is added and normalization is applied. 
