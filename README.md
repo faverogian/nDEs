@@ -10,7 +10,12 @@
 
 ---
 
-## Repository Structure
+## Table of Contents
+- [Repository](#repository)
+- [Installation](#installation)
+- [Contact](#contact)
+
+## Repository
 
 This repository is structured as follows:
 
@@ -30,3 +35,11 @@ This repository is structured as follows:
 - **`report/`**: Project figures and visualizations for reports and presentations.
 - **`requirements.txt`**: Python dependencies file.
 - **`README.md`**: Overview of the project, setup instructions, and usage guide.
+
+## Installation
+
+All required packages in ```requirements.txt can be installed via ```pip.
+
+## Contact
+
+For questions or feedback, please contact [Gian Favero](https://faverogian.github.io/).
